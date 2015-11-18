@@ -83,6 +83,7 @@ SRCS =	\
 	matprops.cxx \
 	mesh.cxx \
 	output.cxx \
+	solver.cxx\
 	rheology.cxx
 
 INCS =	\
@@ -93,7 +94,8 @@ INCS =	\
 	matprops.hpp \
 	utils.hpp \
 	mesh.hpp \
-	output.hpp
+	output.hpp\
+	solver.hpp
 
 OBJS = $(SRCS:.cxx=.$(ndims)d.o)
 
