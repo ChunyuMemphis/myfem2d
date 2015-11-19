@@ -3,7 +3,7 @@
 #include <cstdio>
 #include <iterator>  // For std::distance
 #include <iostream>
-
+#include <time.h>
 #ifdef USE_OMP
 #include <omp.h>
 #else

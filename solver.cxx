@@ -1,6 +1,7 @@
 #include <iostream>
 #include <cstdlib>
 #include <cmath>
+#include <omp.h>
 using namespace std;
 void grd(double **A, double *b, double *x, unsigned int N, unsigned int M)
 {
@@ -108,13 +109,14 @@ void CG(double **A, double *b, double *x, unsigned int N,unsigned int M)
 	double dot[N];
 	double r[N],p0[N];
 	double A_p0[N],beta,rk1;
-	double tol=10e-5;
+	double tol=10e-6;
+#pragma omp parallel for 
 	// zero the dot array
 	for(unsigned int i=0; i < N; i++)
 	{
 		dot[i]=0.0;
 	}
-
+#pragma omp parallel for
 	 // compute A * x0
 	for(unsigned int i = 0; i < N; i++)
 	{
@@ -126,17 +128,20 @@ void CG(double **A, double *b, double *x, unsigned int N,unsigned int M)
 //		std::cout << "\n";
 	}
 	// compute residual
+#pragma omp parallel for
 	for(unsigned int i = 0; i < N; i++)
 	{
 	    r[i] = b[i] - dot[i];
 //		std::cerr << r[i]<<" ";
 	}
 //	cout<<"\n";
+#pragma omp parallel for
 	for(unsigned int i=0; i<N; i++)
 	{
     		p0[i]=r[i];
 //    		cout<<p0[i]<<" ";
     	}   
+#pragma omp parallel for
 	for(unsigned int step=0; step<1000000; step++)
 	{
 		
@@ -147,13 +152,14 @@ void CG(double **A, double *b, double *x, unsigned int N,unsigned int M)
         double lower1=0.0;
         double lower2=0.0;
         double sum=0.0, b1[N];
+#pragma omp parallel for
         	for(unsigned int i = 0; i < N; i++)
 		{
 			upper1 += p0[i] * r[i];
 //			cout<<upper1<<"\n";
 		}
 //		
-
+#pragma omp parallel for
 	    // r^T*A*r
 		for(unsigned int i = 0; i < N; i++)
 	    	{
@@ -174,7 +180,7 @@ void CG(double **A, double *b, double *x, unsigned int N,unsigned int M)
         		std::cerr << "R^T*A*r is ZERO!! Aborting!!" << "\n";
 //        	exit(-1);
         	}
-
+#pragma omp parallel for
         // update the solution
         	for(unsigned int i = 0; i < N; i++)
         	{
@@ -182,10 +188,12 @@ void CG(double **A, double *b, double *x, unsigned int N,unsigned int M)
 //    	  		cout<<x[i]<<" ";
         	}
 //        cout<<"\n";
+#pragma omp parallel for
 		for(unsigned int i=0; i<N; i++)
 		{
 			b1[i]=0.0;
 		}
+#pragma omp parallel for
 		for(unsigned int i=0; i<N; i++)
 		{
 			for(unsigned j=0; j<M; j++)
@@ -193,10 +201,12 @@ void CG(double **A, double *b, double *x, unsigned int N,unsigned int M)
 				b1[i] += A[i][j]*x[j];
 			}
 		}
+#pragma omp parallel for
         	for(unsigned int i=0; i < N; i++)
 		{
 			A_p0[i]=0.0;
 		}
+#pragma omp parallel for
         //update the residual 
         	for(unsigned int i = 0; i < N; i++)
 	    	{
@@ -205,16 +215,18 @@ void CG(double **A, double *b, double *x, unsigned int N,unsigned int M)
 				A_p0[i] += A[i][j] * p0[j];
 		    	}
 		}
+#pragma omp parallel for
 		for(unsigned int i=0;i<N;i++)
         	{
         		r[i]=r[i]-rk1*A_p0[i];
 //        	cout<<r[i]<<" ";
         	}
-
+#pragma omp parallel for
 		for(unsigned int i = 0; i < N; i++)
 	    	{
 			upper2 += p0[i] * r[i];
 		}
+#pragma omp parallel for
 //		cout<<upper2<<"\n";
 	    	for(unsigned int i = 0; i < N; i++)
 	    	{
@@ -228,11 +240,13 @@ void CG(double **A, double *b, double *x, unsigned int N,unsigned int M)
         	{
     	  		beta=upper2/lower2;
         	}  
+#pragma omp parallel for
 		//update p0;
 		for(unsigned int i=0;i<N;i++)
         	{
         		p0[i]=r[i]-beta*p0[i];
         	}
+#pragma omp parallel for
         // computing the norm of the residual.
         	for(unsigned int i=0;i<N;i++)
         	{

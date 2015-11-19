@@ -39,7 +39,7 @@ void update_temperature(const Param &param, const Variables &var,
     // To be completed
 
 	double *b, *x;
-	unsigned int N=100, M=100,n,m;
+	unsigned int N=200, M=200,n,m;
 	double **A = new double *[N];
 	for(unsigned int i=0; i<N;i++){
 		A[i] = new double[M];
@@ -77,8 +77,8 @@ void update_temperature(const Param &param, const Variables &var,
 	}
 ////select the solver, if you do not use other solvers, please comment it.
 //// each time could only use one solver.
-    grd( A, b, x, N, M);
-//    CG(A, b, x, N, M);
+//    grd( A, b, x, N, M);
+    CG(A, b, x, N, M);
 //    Jordan(A, b, x, N, M);
 //    Gauss_seidel(A, b, x, N, M);
 

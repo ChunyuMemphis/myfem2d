@@ -13,7 +13,7 @@
 
 ndims = 2
 opt = 0
-
+openmp = 1
 ## Select C++ compiler
 CXX = g++-mp-4.9
 
@@ -33,7 +33,7 @@ endif
 
 ifneq (, $(findstring g++, $(CXX))) # if using any version of g++
 	CXXFLAGS = -g -std=c++0x
-	LDFLAGS = -lm
+	LDFLAGS = -lm 
 
 	ifeq ($(opt), 1)
 		CXXFLAGS += -O1
@@ -44,6 +44,14 @@ ifneq (, $(findstring g++, $(CXX))) # if using any version of g++
 	else # debugging flags
 		CXXFLAGS += -O0 -Wall -Wno-unused-variable -Wno-unused-function -Wno-unknown-pragmas -fbounds-check -ftrapv
 	endif
+
+	ifeq ($(openmp), 1)
+                CXXFLAGS += -fopenmp -DUSE_OMP
+                LDFLAGS += -fopenmp
+        endif
+
+
+
 
 else ifneq (, $(findstring icpc, $(CXX))) # if using intel compiler, tested with v14
         CXXFLAGS = -g -std=c++0x
@@ -59,10 +67,10 @@ else ifneq (, $(findstring icpc, $(CXX))) # if using intel compiler, tested with
                 CXXFLAGS += -O0 -check=uninit -check-pointers=rw -check-pointers-dangling=all -fp-trap-all=all
         endif
 
-        ifeq ($(openmp), 1)
-                CXXFLAGS += -fopenmp -DUSE_OMP
-                LDFLAGS += -fopenmp
-        endif
+#        ifeq ($(openmp), 1)
+#                CXXFLAGS += -fopenmp -DUSE_OMP
+#                LDFLAGS += -fopenmp
+#        endif
 
 else
 # the only way to display the error message in Makefile ...
