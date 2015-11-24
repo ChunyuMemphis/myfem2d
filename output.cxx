@@ -3,7 +3,7 @@
 #include <cstdio>
 #include <iterator>  // For std::distance
 #include <iostream>
-#include <time.h>
+
 #ifdef USE_OMP
 #include <omp.h>
 #else
@@ -40,7 +40,11 @@ Output::~Output()
 
 void Output::write_info(const Variables& var, double dt)
 {
+#ifdef USE_OMP
+    double run_time = omp_get_wtime() - start_time;
+#else
     double run_time = double(std::clock()) / CLOCKS_PER_SEC;
+#endif
 
     char buffer[256];
     std::snprintf(buffer, 255, "%6d\t%10d\t%12.6e\t%12.4e\t%12.6e\t%8d\t%8d\t%8d\n",

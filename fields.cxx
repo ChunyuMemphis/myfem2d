@@ -37,8 +37,7 @@ void update_temperature(const Param &param, const Variables &var,
 {
 
     // To be completed
-
-	double *b, *x;
+	double *b, *x,tol=1e-5,sum1;
 	unsigned int N=200, M=200,n,m;
 	double **A = new double *[N];
 	for(unsigned int i=0; i<N;i++){
@@ -78,7 +77,34 @@ void update_temperature(const Param &param, const Variables &var,
 ////select the solver, if you do not use other solvers, please comment it.
 //// each time could only use one solver.
 //    grd( A, b, x, N, M);
-    CG(A, b, x, N, M);
+	for(unsigned int step=0; step<1000000; step++)
+	{	
+		double sum=0.0;
+		sum1 = CG(A, b, x, N, M);
+//		sum1 = grd( A, b, x, N, M);
+//		sum1 = Jacobi(A, b, x, N, M);
+//		sum1 = Gauss_seidel(A, b, x, N, M);
+		cout<<sqrt(sum1)<<"\n";
+		if( sqrt(sum1) <= tol)
+		{
+//			cout<<"the input b is : "<<"\n";
+//			for(unsigned int i=0; i<N; i++)
+//			{
+//				cout<<b[i]<<" ";
+//			}
+//			cout<<"\n";
+//			cout<<"the estimated b value: "<<"\n";
+//			for(unsigned int i=0; i<N; i++)
+//			{
+//				cout<< b1[i]<<" ";
+//			}
+//			cout<<"\n";
+			std::cout <<"n step to converge(CG method):  " << step <<"\n" ;
+			std::cout <<"the tolerance is : " << tol << "\n" ;
+			break;
+		}
+	}
+
 //    Jordan(A, b, x, N, M);
 //    Gauss_seidel(A, b, x, N, M);
 
@@ -86,7 +112,7 @@ void update_temperature(const Param &param, const Variables &var,
 	{
     	delete [] A[i];
     }
-    delete [] A;
-    delete [] b;
-    delete [] x;
+    	delete [] A;
+    	delete [] b;
+    	delete [] x;
 }

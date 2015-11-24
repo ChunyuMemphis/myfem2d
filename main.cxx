@@ -41,7 +41,7 @@ void init(const Param& param, Variables& var)
     compute_volume(*var.coord, *var.connectivity, *var.volume);
 
     // initialize shape functions here
-    // compute_shape_fn(...)
+//    compute_shape_fn(*var.coord, *var.connectivity, *var.volume,*var.shpdx, *var.shpdy);
 
     // apply_bcs(param, var, *var.vel);
 

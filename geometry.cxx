@@ -126,4 +126,6 @@ void compute_shape_fn(const array_t &coord, const conn_t &connectivity,
                       const double_vec &volume, shapefn &shpdx, shapefn &shpdy)
 {
     // To be completed.
+
 }
+
