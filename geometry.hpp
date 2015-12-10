@@ -7,8 +7,9 @@ void compute_volume(const array_t &coord, const conn_t &connectivity,
 
 double compute_dt(const Param& param, const Variables& var);
 
-void compute_shape_fn(const array_t &coord, const conn_t &connectivity,
-                      const double_vec &volume,
-                      shapefn &shpdx, shapefn &shpdy);
+//void compute_shape_fn(const array_t &coord, const conn_t &connectivity,
+//                      const double_vec &volume,
+//                      shapefn &shpdx, shapefn &shpdy);
+double phi(unsigned int node_number);
 
 #endif

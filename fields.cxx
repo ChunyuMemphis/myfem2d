@@ -4,17 +4,12 @@
 #include "constants.hpp"
 #include "parameters.hpp"
 #include "matprops.hpp"
+#include "geometry.hpp"
 #include "utils.hpp"
 #include "fields.hpp"
 #include "solver.hpp"
+#include "ic.hpp"
 using namespace std;
-////////////////////////////////////////////////////////////////////
-/////  N: row; M: Column; x: initial guess
-///////////////////////////////////////////////////////////////////
-//void grd( double **A, double *b, double *x, unsigned int N, unsigned int M);
-//void CG(double **A, double *b, double *x, unsigned int N, unsigned int M);
-//void Jacobi(double **A, double *b, double *x, unsigned int N, unsigned int M);
-//void Gauss_seidel(double **A, double *b, double *x,unsigned int N,unsigned int M);
 
 void allocate_variables(const Param &param, Variables& var)
 {
@@ -30,89 +25,453 @@ void allocate_variables(const Param &param, Variables& var)
     var.mat = new MatProps(param, var);
 }
 
+//Variables  var;
 
+//*var.temperature = initial_temperature(param,var,*var.temperature); 
 
-void update_temperature(const Param &param, const Variables &var,
-                        double_vec &temperature, double_vec &tdot)
-{
-
-    // To be completed
-	double *b, *x,tol=1e-5,sum1;
-	unsigned int N=200, M=200,n,m;
-	double **A = new double *[N];
-	for(unsigned int i=0; i<N;i++){
-		A[i] = new double[M];
+ void update_temperature(const Param &param, const Variables &var,
+                         double_vec &temperature, double_vec &tdot)
+ {
+ 	cout << "element "<< var.nelem <<"\n";
+ 	cout << "this is the node"<< var.nnode <<"\n";
+// //////////////////////////////////////////////////////////////////
+// //
+// //    Define variable and allocate memory
+// //      	time_step: time step 
+// ///		pho: density
+// //		c: heat capacity
+// //		k: heat diffusion coefficient
+// //		f: heat production rate
+// //////////////////////////////////////////////////////////////////
+	double *F,*T,local_T,*f;
+	double time_step=1.0,pho=1.29,c=1.004,k_diff_inside=1.9e-5,f1=2000,tol=1e-5,sum1;
+	const int node = var.nnode;
+	const int element = var.nelem;
+/////////////////////////////////////////////////////////////////
+//      Global stiffness matrix
+///////////////////////////////////////////////////////////////
+	double **K = new double *[var.nnode];
+	for(int n=0; n<var.nnode;n++){
+		K[n] = new double[var.nnode];
 	}
-	b = new double[N];
-	x = new double[N];
-
+	double **M = new double *[var.nnode];
+	for(int n=0; n<var.nnode;n++){
+		M[n] = new double[var.nnode];
+	}
+//	double **A = new double *[var.nnode];
+//	for(int n=0; n<var.nnode;n++){
+//		A[n] = new double[var.nnode];
+//	}
+/////////////////////////////////////////////////////////////////
+///   heat production rate and temperature
+////////////////////////////////////////////////////////////////
+	F = new double[var.nnode];
+	f = new double[3];
+	T = new double[var.nnode];
+	for(int i=0; i<var.nnode; i++)
+	{
+		T[i]=20;
+	}
+///////////////////////////////////////////////////////////////////
+//     For local stiffness matrix
+//////////////////////////////////////////////////////////////////
+	double **k = new double *[3];
+	for(unsigned int i=0; i<3;i++){
+                 k[i] = new double[3];
+        }
+	double **m = new double *[3];
+	for(unsigned int i=0; i<3;i++){
+		m[i] = new double[3];
+	}
+	
 	double upper,lower, rk ;
-	for(n=0;n<N;n++)
+// ////////////////////////////////////////////////////////////////////
+// ///    
+// //         Test example 
+// ////////////////////////////////////////////////////////////////////
+// //	for(n=0;n<N;n++)
+// //	{
+// //		for(m=0;m<M;m++)
+// //		{
+// //			if(n==m)
+// //			{
+// //				A[n][m]=-2.0;
+// //			}
+// //			else if(n==m+1)
+// //			{
+// //				A[n][m]=1.0;
+// //			}
+// //			else if(n==m-1)
+// //			{
+// //				A[n][m]=1.0;
+// //			}
+// //			else
+// //				A[n][m]=0.0;
+// //		}
+// //	}
+// //	for(n=0; n<N; n++)
+// //	{
+// //		b[n]=0.5;
+// //		x[n]=0.5;
+// //	}
+/////////////////////////////////////////////////////////////////////////////
+//
+//            Time dependent heat diffusion problem
+/////////////////////////////////////////////////////////////////////////////
+	
+	double ke[3][3]= {
+		{2, -1, -1},
+		{-1, 1, 0},
+		{-1, 0, 1}
+	};
+//	double local[3]={0.0,0.0,0.0};
+
+	for(int e=0; e<var.nelem; ++e)
 	{
-		for(m=0;m<M;m++)
-		{
-			if(n==m)
+		const int  *conn = (*var.connectivity)[e];
+		const array_t& coord = *var.coord;
+		double f[3]={0.0,0.0,0.0};
+		int n0 = conn[0];
+		int n1 = conn[1];
+		int n2 = conn[2];
+		const double *a1 = coord[n0];
+		const double *b1 = coord[n1];
+		const double *c1 = coord[n2];
+//		for(int i=0; i<3; i++)
+//		{
+//				if(i==0)
+//				{
+//					local[i]=20.0;
+//				}
+//				else
+//				{
+//					local[i]=0.0;
+//				}
+//		}
+		////////// If it is inside the domain 
+
+		if((*var.bcflag)[n0] == 0 && (*var.bcflag)[n1]==0 && (*var.bcflag)[n2]==0)
+		{		
+			for(int i=0; i<3; i++)
 			{
-				A[n][m]=-2.0;
+				for(int j=0; j<3; i++)
+				{
+//					k[i][j]=0.5*pho*c*phi(i)*phi(j)*2*((*var.volume)[e]) + time_step * 0.5*k_diff*ke[i][j]*2*((*var.volume)[e]);
+					k[i][j]=0.5*k_diff_inside*ke[i][j]*2*((*var.volume)[e]);
+					m[i][j]=0.5*pho*c*phi(i)*phi(j)*2*((*var.volume)[e]);
+//					b[i]=b[i] + (0.5)*pho*c*phi(i)*phi(j)*2*((*var.volume)[e]) * local[j];
+					M[conn[i]][conn[j]] += m[i][j];
+					K[conn[i]][conn[j]] += k[i][j];
+//					A[i][j]=M[i][j]+time_step*K[i][j];
+				}
+				if(((a1[0]+b1[0]+c1[0])/3)-100<=1 && ((a1[1]+b1[1]+c1[1])/3)-100<1)
+				{			
+					f[i]= 0.5*f1*phi(i)*2*((*var.volume)[e]);
+				}
+				else
+				{
+					f[i]=0;
+				}
+			
+				F[conn[i]] += f[i];
 			}
-			else if(n==m+1)
-			{
-				A[n][m]=1.0;
-			}
-			else if(n==m-1)
-			{
-				A[n][m]=1.0;
-			}
-			else
-				A[n][m]=0.0;
-//			cout << A[n][m] <<" ";
+
 		}
-//		cout << "\n";
+		////////////////if two nodes are on the boundary( 0,1 corresponded global nodes on boundary)
+		else if((*var.bcflag)[n0] != 0 && (*var.bcflag)[n1] != 0 && (*var.bcflag)[n2] == 0)
+		{
+			
+			k[0][0]=1;
+			k[1][1]=1;
+			k[2][2]= 0.5*k_diff_inside*ke[2][2]*2*((*var.volume)[e]);
+			k[0][1]=0;k[0][2]=0;
+			k[1][0]=0;k[1][2]=0;
+			k[2][0]=0;k[2][1]=0;
+			for(int i=0; i<3; i++)
+			{
+				for(int j=0; j<3; i++)
+				{
+//					k[i][j]=0.5*pho*c*phi(i)*phi(j)*2*((*var.volume)[e]) + time_step * 0.5*k_diff*ke[i][j]*2*((*var.volume)[e]);
+					m[i][j]=0.5*pho*c*phi(i)*phi(j)*2*((*var.volume)[e]);
+//					b[i]=b[i] + (0.5)*pho*c*phi(i)*phi(j)*2*((*var.volume)[e]) * local[j];
+					M[conn[i]][conn[j]] += m[i][j];
+					K[conn[i]][conn[j]] += k[i][j];
+//					A[i][j]=M[i][j]+time_step*K[i][j];
+				}
+				if(((a1[0]+b1[0]+c1[0])/3)-100<=1 && ((a1[1]+b1[1]+c1[1])/3)-100<1)
+				{			
+					f[i]= 0.5*f1*phi(i)*2*((*var.volume)[e]);
+				}
+				else
+				{
+					f[i]=0;
+				}
+			
+				F[conn[i]] += f[i];
+			}
+			
+			// for(int j=0; j<3; j++)
+			// {
+			// 	b[2]=b[2] + (0.5)*pho*c*phi(2)*phi(j)*2*((*var.volume)[e]) * local[j];
+			// }
+			// for(int i=0; i<3; i++)
+			// {
+			// 	for(int j=0; j<3; j++)
+			// 	{
+				 
+			// 		A[conn[i]][conn[j]] += k[i][j];
+			// 	}
+			// 	F[conn[i]] += b[i];
+			// }
+		}
+		////////////////if two nodes are on the boundary( 0, 2 nodes on boundary)
+		else if((*var.bcflag)[n0] !=0 &&(*var.bcflag)[n1]==0 && (*var.bcflag)[n2] != 0 )
+		{
+			k[0][0]=1;
+			k[2][2]=1;
+			k[1][1]= 0.5*k_diff_inside*ke[1][1]*2*((*var.volume)[e]);
+			k[0][1]=0;k[0][2]=0;
+			k[1][0]=0;k[1][2]=0;
+			k[2][0]=0;k[2][1]=0;
+			for(int i=0; i<3; i++)
+			{
+				for(int j=0; j<3; i++)
+				{
+//					k[i][j]=0.5*pho*c*phi(i)*phi(j)*2*((*var.volume)[e]) + time_step * 0.5*k_diff*ke[i][j]*2*((*var.volume)[e]);
+					m[i][j]=0.5*pho*c*phi(i)*phi(j)*2*((*var.volume)[e]);
+//					b[i]=b[i] + (0.5)*pho*c*phi(i)*phi(j)*2*((*var.volume)[e]) * local[j];
+					M[conn[i]][conn[j]] += m[i][j];
+					K[conn[i]][conn[j]] += k[i][j];
+//					A[i][j]=M[i][j]+time_step*K[i][j];
+				}
+				if(((a1[0]+b1[0]+c1[0])/3)-100<=1 && ((a1[1]+b1[1]+c1[1])/3)-100<1)
+				{			
+					f[i]= 0.5*f1*phi(i)*2*((*var.volume)[e]);
+				}
+				else
+				{
+					f[i]=0;
+				}
+			
+				F[conn[i]] += f[i];
+			}
+		}
+		////////////////if two nodes are on the boundary( 1, 2 nodes on boundary)
+		else if((*var.bcflag)[n0] == 0 && (*var.bcflag)[n1] != 0 && (*var.bcflag)[n2] != 0)
+		{
+			k[2][2]=1;
+			k[1][1]=1;
+			k[0][0]= 0.5*k_diff_inside*ke[0][0]*2*((*var.volume)[e]);
+			k[0][1]=0;k[0][2]=0;
+			k[1][0]=0;k[1][2]=0;
+			k[2][0]=0;k[2][1]=0;
+			for(int i=0; i<3; i++)
+			{
+				for(int j=0; j<3; i++)
+				{
+//					k[i][j]=0.5*pho*c*phi(i)*phi(j)*2*((*var.volume)[e]) + time_step * 0.5*k_diff*ke[i][j]*2*((*var.volume)[e]);
+					m[i][j]=0.5*pho*c*phi(i)*phi(j)*2*((*var.volume)[e]);
+//					b[i]=b[i] + (0.5)*pho*c*phi(i)*phi(j)*2*((*var.volume)[e]) * local[j];
+					M[conn[i]][conn[j]] += m[i][j];
+					K[conn[i]][conn[j]] += k[i][j];
+//					A[i][j]=M[i][j]+time_step*K[i][j];
+				}
+				if(((a1[0]+b1[0]+c1[0])/3)-100<=1 && ((a1[1]+b1[1]+c1[1])/3)-100<1)
+				{			
+					f[i]= 0.5*f1*phi(i)*2*((*var.volume)[e]);
+				}
+				else
+				{
+					f[i]=0;
+				}
+			
+				F[conn[i]] += f[i];
+			}
+		}
+		/////  node 0 on the boundary , but nodes 1, 2 are inside the domain
+		else if ((*var.bcflag)[n0] != 0 && (*var.bcflag)[n1] == 0 && (*var.bcflag)[n2] == 0)
+		{
+			cout<<"node 0 corresoned global node on the boundary";
+			for(int i=1; i<3; i++)
+			{
+				for(int j=1; j<3; j++)
+				{
+					k[i][j]=0.5*k_diff_inside*ke[i][j]*2*((*var.volume)[e]);
+				}
+			}
+			k[0][0]=1; k[0][1]=0;k[0][2]=0;
+			k[1][0]=0;k[2][0]=0;
+
+			for(int i=0; i<3; i++)
+			{
+				for(int j=0; j<3; i++)
+				{
+//					k[i][j]=0.5*pho*c*phi(i)*phi(j)*2*((*var.volume)[e]) + time_step * 0.5*k_diff*ke[i][j]*2*((*var.volume)[e]);
+//					k[i][j]=0.5*k_diff_inside*ke[i][j]*2*((*var.volume)[e]);
+					m[i][j]=0.5*pho*c*phi(i)*phi(j)*2*((*var.volume)[e]);
+//					b[i]=b[i] + (0.5)*pho*c*phi(i)*phi(j)*2*((*var.volume)[e]) * local[j];
+					M[conn[i]][conn[j]] += m[i][j];
+					K[conn[i]][conn[j]] += k[i][j];
+//					A[i][j]=M[i][j]+time_step*K[i][j];
+				}
+
+				if(((a1[0]+b1[0]+c1[0])/3)-100<=1 && ((a1[1]+b1[1]+c1[1])/3)-100<1)
+				{			
+					f[i]= 0.5*f1*phi(i)*2*((*var.volume)[e]);
+				}
+				else
+				{
+					f[i]=0;
+				}
+			
+				F[conn[i]] += f[i];
+			}
+
+		}
+		/////  node 1 on the boundary , but nodes 0, 2 are inside the domain
+		else if((*var.bcflag)[n0]== 0 &&(*var.bcflag)[n1] != 0 && (*var.bcflag)[n2] == 0)
+		{	
+			k[0][0]=0.5*k_diff_inside*ke[0][0]*2*((*var.volume)[e]);
+			k[0][1]=0; k[0][2]=0;
+			k[1][0]=0; k[1][1]=1; k[1][2]=0;
+			k[2][0]=0.5*k_diff_inside*ke[2][0]*2*((*var.volume)[e]);
+			k[2][1]=0;
+			k[2][2]=0.5*k_diff_inside*ke[2][2]*2*((*var.volume)[e]);
+			for(int i=0; i<3; i++)
+			{
+				for(int j=0; j<3; i++)
+				{
+//					k[i][j]=0.5*pho*c*phi(i)*phi(j)*2*((*var.volume)[e]) + time_step * 0.5*k_diff*ke[i][j]*2*((*var.volume)[e]);
+//					k[i][j]=0.5*k_diff_inside*ke[i][j]*2*((*var.volume)[e]);
+					m[i][j]=0.5*pho*c*phi(i)*phi(j)*2*((*var.volume)[e]);
+//					b[i]=b[i] + (0.5)*pho*c*phi(i)*phi(j)*2*((*var.volume)[e]) * local[j];
+					M[conn[i]][conn[j]] += m[i][j];
+					K[conn[i]][conn[j]] += k[i][j];
+//					A[i][j]=M[i][j]+time_step*K[i][j];
+				}
+
+				if(((a1[0]+b1[0]+c1[0])/3)-100<=1 && ((a1[1]+b1[1]+c1[1])/3)-100<1)
+				{			
+					f[i]= 0.5*f1*phi(i)*2*((*var.volume)[e]);
+				}
+				else
+				{
+					f[i]=0;
+				}
+			
+				F[conn[i]] += f[i];
+			}
+		}
+		/////  node 2 on the boundary , but nodes 0, 1 are inside the domain
+		else if ((*var.bcflag)[n0]== 0 &&(*var.bcflag)[n1] == 0 && (*var.bcflag)[n2] != 0)
+		{
+			for(int i=0; i<2; i++)
+			{
+				for(int j=0; j<2; j++)
+				{	
+					k[i][j]=0.5*k_diff_inside*ke[i][j]*2*((*var.volume)[e]);
+				}
+			}	
+			k[0][2]=0;k[1][2]=0;k[2][0]=0;k[2][1]=0;k[2][2]=1;
+			for(int i=0; i<3; i++)
+			{
+				for(int j=0; j<3; i++)
+				{
+//					k[i][j]=0.5*pho*c*phi(i)*phi(j)*2*((*var.volume)[e]) + time_step * 0.5*k_diff*ke[i][j]*2*((*var.volume)[e]);
+//					k[i][j]=0.5*k_diff_inside*ke[i][j]*2*((*var.volume)[e]);
+					m[i][j]=0.5*pho*c*phi(i)*phi(j)*2*((*var.volume)[e]);
+//					b[i]=b[i] + (0.5)*pho*c*phi(i)*phi(j)*2*((*var.volume)[e]) * local[j];
+					M[conn[i]][conn[j]] += m[i][j];
+					K[conn[i]][conn[j]] += k[i][j];
+//					A[i][j]=M[i][j]+time_step*K[i][j];
+				}
+
+				if(((a1[0]+b1[0]+c1[0])/3)-100<=1 && ((a1[1]+b1[1]+c1[1])/3)-100<1)
+				{			
+					f[i]= 0.5*f1*phi(i)*2*((*var.volume)[e]);
+				}
+				else
+				{
+					f[i]=0;
+				}
+			
+				F[conn[i]] += f[i];
+			}
+
+
+		}
+		else if ((*var.bcflag)[n0] != 0 &&(*var.bcflag)[n1] != 0 && (*var.bcflag)[n2] != 0)
+		{
+			k[0][0]=1;k[1][1]=1;k[2][2]=1;
+			k[0][1]=0;k[0][2]=0;k[1][0]=0;k[1][2]=0;k[2][0]=0;k[2][1]=0;
+			for(int i=0; i<3; i++)
+			{
+				for(int j=0; j<3; i++)
+				{
+//					k[i][j]=0.5*pho*c*phi(i)*phi(j)*2*((*var.volume)[e]) + time_step * 0.5*k_diff*ke[i][j]*2*((*var.volume)[e]);
+//					k[i][j]=0.5*k_diff_inside*ke[i][j]*2*((*var.volume)[e]);
+					m[i][j]=0.5*pho*c*phi(i)*phi(j)*2*((*var.volume)[e]);
+//					b[i]=b[i] + (0.5)*pho*c*phi(i)*phi(j)*2*((*var.volume)[e]) * local[j];
+					M[conn[i]][conn[j]] += m[i][j];
+					K[conn[i]][conn[j]] += k[i][j];
+//					A[i][j]=M[i][j]+time_step*K[i][j];
+				}
+
+				if(((a1[0]+b1[0]+c1[0])/3)-100<=1 && ((a1[1]+b1[1]+c1[1])/3)-100<1)
+				{			
+					f[i]= 0.5*f1*phi(i)*2*((*var.volume)[e]);
+				}
+				else
+				{
+					f[i]=0;
+				}
+			
+				F[conn[i]] += f[i];
+			}
+		}
+
 	}
-	for(n=0; n<N; n++)
-	{
-		b[n]=0.5;
-		x[n]=0.5;
-	}
-////select the solver, if you do not use other solvers, please comment it.
-//// each time could only use one solver.
-//    grd( A, b, x, N, M);
+// /////////////////////////////////////////////////////////////////////////////
+// ////select the solver, if you do not use other solvers, please comment it.
+// //// each time could only use one solver.
+// // 
+// ////////////////////////////////////////////////////////////////////////////
 	for(unsigned int step=0; step<1000000; step++)
 	{	
 		double sum=0.0;
-		sum1 = CG(A, b, x, N, M);
+//		sum1 = CG(A, F, T, node, node);
 //		sum1 = grd( A, b, x, N, M);
 //		sum1 = Jacobi(A, b, x, N, M);
 //		sum1 = Gauss_seidel(A, b, x, N, M);
-		cout<<sqrt(sum1)<<"\n";
-		if( sqrt(sum1) <= tol)
-		{
-//			cout<<"the input b is : "<<"\n";
-//			for(unsigned int i=0; i<N; i++)
-//			{
-//				cout<<b[i]<<" ";
-//			}
-//			cout<<"\n";
-//			cout<<"the estimated b value: "<<"\n";
-//			for(unsigned int i=0; i<N; i++)
-//			{
-//				cout<< b1[i]<<" ";
-//			}
-//			cout<<"\n";
-			std::cout <<"n step to converge(CG method):  " << step <<"\n" ;
-			std::cout <<"the tolerance is : " << tol << "\n" ;
-			break;
-		}
+//		cout<<sqrt(sum1)<<"\n";
+//		if( sqrt(sum1) <= tol)
+//		{
+//			std::cout <<"n step to converge(CG method):  " << step <<"\n" ;
+//			std::cout <<"the tolerance is : " << tol << "\n" ;
+//			break;
+//		}
 	}
 
-//    Jordan(A, b, x, N, M);
-//    Gauss_seidel(A, b, x, N, M);
 
-	for(unsigned int i=0; i<N; i++)
+	for(int i=0; i<var.nnode; i++)
 	{
-    	delete [] A[i];
+    	delete [] K[i];
+		delete [] M[i];
     }
-    	delete [] A;
-    	delete [] b;
-    	delete [] x;
+    delete [] K;
+	delete [] M;
+
+	for(unsigned int i=0; i<3;i++)
+	{
+		delete [] k[i];
+		delete [] m[i];
+//		delete [] ke[i];
+	}
+	delete [] k;
+	delete [] m;
+//	delete [] ke;
+    delete [] F;
+	delete [] T;
+	delete [] f;
+//	delete [] local;
 }

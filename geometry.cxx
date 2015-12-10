@@ -121,11 +121,30 @@ double compute_dt(const Param& param, const Variables& var)
     return dt;
 }
 
-
-void compute_shape_fn(const array_t &coord, const conn_t &connectivity,
-                      const double_vec &volume, shapefn &shpdx, shapefn &shpdy)
+double phi(unsigned int node_number)
 {
-    // To be completed.
-
+        double shape,x=0.3333, y=0.3333;
+        if(node_number == 0)
+        {
+            shape = 1-x-y;
+        }
+        else if(node_number == 1)
+        {
+            shape = x;
+        }
+        else
+        {   
+            shape = y;
+        }
+        return shape;
 }
+//void compute_shape_fn(double x1, double y1,  shapefn &shpdx, shapefn &shpdy)
+//{
+    // To be completed.
+//	int e;
+//	shpdx[e][0]=1-x1-y1;	
+//	shpdx[e][1]=x1;
+//	shpdx[e][2]=y1;
+//}
+
 
