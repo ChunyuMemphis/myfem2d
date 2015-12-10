@@ -1,6 +1,8 @@
 #include <iostream>
 #include <cstdlib>
 #include <cmath>
+#include <iterator>
+#include <vector>
 #include "constants.hpp"
 #include "parameters.hpp"
 #include "matprops.hpp"
@@ -18,7 +20,7 @@ void allocate_variables(const Param &param, Variables& var)
 
     var.volume = new double_vec(e);
     var.temperature = new double_vec(n);
-
+//    var.temperature = new double(n);
     var.shpdx = new shapefn(e);
     var.shpdz = new shapefn(e);
 
@@ -32,6 +34,8 @@ void allocate_variables(const Param &param, Variables& var)
  void update_temperature(const Param &param, const Variables &var,
                          double_vec &temperature, double_vec &tdot)
  {
+
+
  	cout << "element "<< var.nelem <<"\n";
  	cout << "this is the node"<< var.nnode <<"\n";
 // //////////////////////////////////////////////////////////////////
@@ -70,8 +74,29 @@ void allocate_variables(const Param &param, Variables& var)
 	T = new double[var.nnode];
 	for(int i=0; i<var.nnode; i++)
 	{
-		T[i]=20;
+		T[i]=20.0;
+//		cout<<T[i]<<"\n";
 	}
+	for(int i=0; i<var.nnode;i++)
+	{
+		cout <<"before"<< temperature[i] <<"\n";
+	}
+	for(int i=0; i<var.nnode; i++)
+	{
+		temperature.at(i)=T[i];
+	}
+	for(int i=0; i<var.nnode;i++)
+	{
+		cout <<"after"<< temperature[i] <<"\n";
+	}
+//	std::vector<double> vec( std::begin(T), std::end(T));
+//	std::vector<double> temperature(std::begin(T),std::end(T));
+	// for(int i=0; i<var.nnode; i++)
+	// {
+	// 	var.temperature[i]=T[i];
+	// 	cout<<"the temperature is"<<var.temperature[i]<<"\n";
+	// }
+
 ///////////////////////////////////////////////////////////////////
 //     For local stiffness matrix
 //////////////////////////////////////////////////////////////////
@@ -85,35 +110,7 @@ void allocate_variables(const Param &param, Variables& var)
 	}
 	
 	double upper,lower, rk ;
-// ////////////////////////////////////////////////////////////////////
-// ///    
-// //         Test example 
-// ////////////////////////////////////////////////////////////////////
-// //	for(n=0;n<N;n++)
-// //	{
-// //		for(m=0;m<M;m++)
-// //		{
-// //			if(n==m)
-// //			{
-// //				A[n][m]=-2.0;
-// //			}
-// //			else if(n==m+1)
-// //			{
-// //				A[n][m]=1.0;
-// //			}
-// //			else if(n==m-1)
-// //			{
-// //				A[n][m]=1.0;
-// //			}
-// //			else
-// //				A[n][m]=0.0;
-// //		}
-// //	}
-// //	for(n=0; n<N; n++)
-// //	{
-// //		b[n]=0.5;
-// //		x[n]=0.5;
-// //	}
+
 /////////////////////////////////////////////////////////////////////////////
 //
 //            Time dependent heat diffusion problem
@@ -124,7 +121,6 @@ void allocate_variables(const Param &param, Variables& var)
 		{-1, 1, 0},
 		{-1, 0, 1}
 	};
-//	double local[3]={0.0,0.0,0.0};
 
 	for(int e=0; e<var.nelem; ++e)
 	{
@@ -137,18 +133,30 @@ void allocate_variables(const Param &param, Variables& var)
 		const double *a1 = coord[n0];
 		const double *b1 = coord[n1];
 		const double *c1 = coord[n2];
-//		for(int i=0; i<3; i++)
-//		{
-//				if(i==0)
-//				{
-//					local[i]=20.0;
-//				}
-//				else
-//				{
-//					local[i]=0.0;
-//				}
-//		}
-		////////// If it is inside the domain 
+//		cout <<"the global node number "<< n0 <<"\n";
+		for(int i=0; i<3; i++)
+		{
+			for(int j=0; j<3; j++)
+			{
+				m[i][j]=0.5*pho*c*phi(i)*phi(j)*2*((*var.volume)[e]);
+//				cout<<m[i][j]<<"\n";
+				M[conn[i]][conn[j]] += m[i][j];
+			}
+		}
+		for(int i=0; i<3; i++)
+		{
+			if(((a1[0]+b1[0]+c1[0])/3)-100<=1 && ((a1[1]+b1[1]+c1[1])/3)-100<1)
+			{			
+				f[i]= 0.5*f1*phi(i)*2*((*var.volume)[e]);
+			}
+			else
+			{
+				f[i]=0;
+			}
+//			cout <<"the local f is "<<f[i]<<"\n";
+			F[conn[i]] += f[i];
+		}
+// 		////////// If it is inside the domain 
 
 		if((*var.bcflag)[n0] == 0 && (*var.bcflag)[n1]==0 && (*var.bcflag)[n2]==0)
 		{		
@@ -158,28 +166,17 @@ void allocate_variables(const Param &param, Variables& var)
 				{
 //					k[i][j]=0.5*pho*c*phi(i)*phi(j)*2*((*var.volume)[e]) + time_step * 0.5*k_diff*ke[i][j]*2*((*var.volume)[e]);
 					k[i][j]=0.5*k_diff_inside*ke[i][j]*2*((*var.volume)[e]);
-					m[i][j]=0.5*pho*c*phi(i)*phi(j)*2*((*var.volume)[e]);
 //					b[i]=b[i] + (0.5)*pho*c*phi(i)*phi(j)*2*((*var.volume)[e]) * local[j];
-					M[conn[i]][conn[j]] += m[i][j];
 					K[conn[i]][conn[j]] += k[i][j];
 //					A[i][j]=M[i][j]+time_step*K[i][j];
 				}
-				if(((a1[0]+b1[0]+c1[0])/3)-100<=1 && ((a1[1]+b1[1]+c1[1])/3)-100<1)
-				{			
-					f[i]= 0.5*f1*phi(i)*2*((*var.volume)[e]);
-				}
-				else
-				{
-					f[i]=0;
-				}
-			
-				F[conn[i]] += f[i];
+				
 			}
 
 		}
-		////////////////if two nodes are on the boundary( 0,1 corresponded global nodes on boundary)
+// 		////////////////if two nodes are on the boundary( 0,1 corresponded global nodes on boundary)
 		else if((*var.bcflag)[n0] != 0 && (*var.bcflag)[n1] != 0 && (*var.bcflag)[n2] == 0)
-		{
+ 		{
 			
 			k[0][0]=1;
 			k[1][1]=1;
@@ -187,44 +184,17 @@ void allocate_variables(const Param &param, Variables& var)
 			k[0][1]=0;k[0][2]=0;
 			k[1][0]=0;k[1][2]=0;
 			k[2][0]=0;k[2][1]=0;
+			
 			for(int i=0; i<3; i++)
-			{
-				for(int j=0; j<3; i++)
+			{	
+				for(int j=0; j<3; j++)
 				{
-//					k[i][j]=0.5*pho*c*phi(i)*phi(j)*2*((*var.volume)[e]) + time_step * 0.5*k_diff*ke[i][j]*2*((*var.volume)[e]);
-					m[i][j]=0.5*pho*c*phi(i)*phi(j)*2*((*var.volume)[e]);
-//					b[i]=b[i] + (0.5)*pho*c*phi(i)*phi(j)*2*((*var.volume)[e]) * local[j];
-					M[conn[i]][conn[j]] += m[i][j];
 					K[conn[i]][conn[j]] += k[i][j];
-//					A[i][j]=M[i][j]+time_step*K[i][j];
 				}
-				if(((a1[0]+b1[0]+c1[0])/3)-100<=1 && ((a1[1]+b1[1]+c1[1])/3)-100<1)
-				{			
-					f[i]= 0.5*f1*phi(i)*2*((*var.volume)[e]);
-				}
-				else
-				{
-					f[i]=0;
-				}
+ 			}
 			
-				F[conn[i]] += f[i];
-			}
-			
-			// for(int j=0; j<3; j++)
-			// {
-			// 	b[2]=b[2] + (0.5)*pho*c*phi(2)*phi(j)*2*((*var.volume)[e]) * local[j];
-			// }
-			// for(int i=0; i<3; i++)
-			// {
-			// 	for(int j=0; j<3; j++)
-			// 	{
-				 
-			// 		A[conn[i]][conn[j]] += k[i][j];
-			// 	}
-			// 	F[conn[i]] += b[i];
-			// }
-		}
-		////////////////if two nodes are on the boundary( 0, 2 nodes on boundary)
+ 		}
+// 		////////////////if two nodes are on the boundary( 0, 2 nodes on boundary)
 		else if((*var.bcflag)[n0] !=0 &&(*var.bcflag)[n1]==0 && (*var.bcflag)[n2] != 0 )
 		{
 			k[0][0]=1;
@@ -237,26 +207,11 @@ void allocate_variables(const Param &param, Variables& var)
 			{
 				for(int j=0; j<3; i++)
 				{
-//					k[i][j]=0.5*pho*c*phi(i)*phi(j)*2*((*var.volume)[e]) + time_step * 0.5*k_diff*ke[i][j]*2*((*var.volume)[e]);
-					m[i][j]=0.5*pho*c*phi(i)*phi(j)*2*((*var.volume)[e]);
-//					b[i]=b[i] + (0.5)*pho*c*phi(i)*phi(j)*2*((*var.volume)[e]) * local[j];
-					M[conn[i]][conn[j]] += m[i][j];
 					K[conn[i]][conn[j]] += k[i][j];
-//					A[i][j]=M[i][j]+time_step*K[i][j];
 				}
-				if(((a1[0]+b1[0]+c1[0])/3)-100<=1 && ((a1[1]+b1[1]+c1[1])/3)-100<1)
-				{			
-					f[i]= 0.5*f1*phi(i)*2*((*var.volume)[e]);
-				}
-				else
-				{
-					f[i]=0;
-				}
-			
-				F[conn[i]] += f[i];
 			}
 		}
-		////////////////if two nodes are on the boundary( 1, 2 nodes on boundary)
+// 		////////////////if two nodes are on the boundary( 1, 2 nodes on boundary)
 		else if((*var.bcflag)[n0] == 0 && (*var.bcflag)[n1] != 0 && (*var.bcflag)[n2] != 0)
 		{
 			k[2][2]=1;
@@ -267,28 +222,13 @@ void allocate_variables(const Param &param, Variables& var)
 			k[2][0]=0;k[2][1]=0;
 			for(int i=0; i<3; i++)
 			{
-				for(int j=0; j<3; i++)
+				for(int j=0; j<3; j++)
 				{
-//					k[i][j]=0.5*pho*c*phi(i)*phi(j)*2*((*var.volume)[e]) + time_step * 0.5*k_diff*ke[i][j]*2*((*var.volume)[e]);
-					m[i][j]=0.5*pho*c*phi(i)*phi(j)*2*((*var.volume)[e]);
-//					b[i]=b[i] + (0.5)*pho*c*phi(i)*phi(j)*2*((*var.volume)[e]) * local[j];
-					M[conn[i]][conn[j]] += m[i][j];
 					K[conn[i]][conn[j]] += k[i][j];
-//					A[i][j]=M[i][j]+time_step*K[i][j];
 				}
-				if(((a1[0]+b1[0]+c1[0])/3)-100<=1 && ((a1[1]+b1[1]+c1[1])/3)-100<1)
-				{			
-					f[i]= 0.5*f1*phi(i)*2*((*var.volume)[e]);
-				}
-				else
-				{
-					f[i]=0;
-				}
-			
-				F[conn[i]] += f[i];
 			}
 		}
-		/////  node 0 on the boundary , but nodes 1, 2 are inside the domain
+// 		/////  node 0 on the boundary , but nodes 1, 2 are inside the domain
 		else if ((*var.bcflag)[n0] != 0 && (*var.bcflag)[n1] == 0 && (*var.bcflag)[n2] == 0)
 		{
 			cout<<"node 0 corresoned global node on the boundary";
@@ -306,29 +246,12 @@ void allocate_variables(const Param &param, Variables& var)
 			{
 				for(int j=0; j<3; i++)
 				{
-//					k[i][j]=0.5*pho*c*phi(i)*phi(j)*2*((*var.volume)[e]) + time_step * 0.5*k_diff*ke[i][j]*2*((*var.volume)[e]);
-//					k[i][j]=0.5*k_diff_inside*ke[i][j]*2*((*var.volume)[e]);
-					m[i][j]=0.5*pho*c*phi(i)*phi(j)*2*((*var.volume)[e]);
-//					b[i]=b[i] + (0.5)*pho*c*phi(i)*phi(j)*2*((*var.volume)[e]) * local[j];
-					M[conn[i]][conn[j]] += m[i][j];
 					K[conn[i]][conn[j]] += k[i][j];
-//					A[i][j]=M[i][j]+time_step*K[i][j];
 				}
-
-				if(((a1[0]+b1[0]+c1[0])/3)-100<=1 && ((a1[1]+b1[1]+c1[1])/3)-100<1)
-				{			
-					f[i]= 0.5*f1*phi(i)*2*((*var.volume)[e]);
-				}
-				else
-				{
-					f[i]=0;
-				}
-			
-				F[conn[i]] += f[i];
 			}
 
 		}
-		/////  node 1 on the boundary , but nodes 0, 2 are inside the domain
+// 		/////  node 1 on the boundary , but nodes 0, 2 are inside the domain
 		else if((*var.bcflag)[n0]== 0 &&(*var.bcflag)[n1] != 0 && (*var.bcflag)[n2] == 0)
 		{	
 			k[0][0]=0.5*k_diff_inside*ke[0][0]*2*((*var.volume)[e]);
@@ -341,28 +264,11 @@ void allocate_variables(const Param &param, Variables& var)
 			{
 				for(int j=0; j<3; i++)
 				{
-//					k[i][j]=0.5*pho*c*phi(i)*phi(j)*2*((*var.volume)[e]) + time_step * 0.5*k_diff*ke[i][j]*2*((*var.volume)[e]);
-//					k[i][j]=0.5*k_diff_inside*ke[i][j]*2*((*var.volume)[e]);
-					m[i][j]=0.5*pho*c*phi(i)*phi(j)*2*((*var.volume)[e]);
-//					b[i]=b[i] + (0.5)*pho*c*phi(i)*phi(j)*2*((*var.volume)[e]) * local[j];
-					M[conn[i]][conn[j]] += m[i][j];
 					K[conn[i]][conn[j]] += k[i][j];
-//					A[i][j]=M[i][j]+time_step*K[i][j];
 				}
-
-				if(((a1[0]+b1[0]+c1[0])/3)-100<=1 && ((a1[1]+b1[1]+c1[1])/3)-100<1)
-				{			
-					f[i]= 0.5*f1*phi(i)*2*((*var.volume)[e]);
-				}
-				else
-				{
-					f[i]=0;
-				}
-			
-				F[conn[i]] += f[i];
 			}
 		}
-		/////  node 2 on the boundary , but nodes 0, 1 are inside the domain
+// 		/////  node 2 on the boundary , but nodes 0, 1 are inside the domain
 		else if ((*var.bcflag)[n0]== 0 &&(*var.bcflag)[n1] == 0 && (*var.bcflag)[n2] != 0)
 		{
 			for(int i=0; i<2; i++)
@@ -377,28 +283,9 @@ void allocate_variables(const Param &param, Variables& var)
 			{
 				for(int j=0; j<3; i++)
 				{
-//					k[i][j]=0.5*pho*c*phi(i)*phi(j)*2*((*var.volume)[e]) + time_step * 0.5*k_diff*ke[i][j]*2*((*var.volume)[e]);
-//					k[i][j]=0.5*k_diff_inside*ke[i][j]*2*((*var.volume)[e]);
-					m[i][j]=0.5*pho*c*phi(i)*phi(j)*2*((*var.volume)[e]);
-//					b[i]=b[i] + (0.5)*pho*c*phi(i)*phi(j)*2*((*var.volume)[e]) * local[j];
-					M[conn[i]][conn[j]] += m[i][j];
 					K[conn[i]][conn[j]] += k[i][j];
-//					A[i][j]=M[i][j]+time_step*K[i][j];
 				}
-
-				if(((a1[0]+b1[0]+c1[0])/3)-100<=1 && ((a1[1]+b1[1]+c1[1])/3)-100<1)
-				{			
-					f[i]= 0.5*f1*phi(i)*2*((*var.volume)[e]);
-				}
-				else
-				{
-					f[i]=0;
-				}
-			
-				F[conn[i]] += f[i];
 			}
-
-
 		}
 		else if ((*var.bcflag)[n0] != 0 &&(*var.bcflag)[n1] != 0 && (*var.bcflag)[n2] != 0)
 		{
@@ -406,31 +293,14 @@ void allocate_variables(const Param &param, Variables& var)
 			k[0][1]=0;k[0][2]=0;k[1][0]=0;k[1][2]=0;k[2][0]=0;k[2][1]=0;
 			for(int i=0; i<3; i++)
 			{
-				for(int j=0; j<3; i++)
+				for(int j=0; j<3; j++)
 				{
-//					k[i][j]=0.5*pho*c*phi(i)*phi(j)*2*((*var.volume)[e]) + time_step * 0.5*k_diff*ke[i][j]*2*((*var.volume)[e]);
-//					k[i][j]=0.5*k_diff_inside*ke[i][j]*2*((*var.volume)[e]);
-					m[i][j]=0.5*pho*c*phi(i)*phi(j)*2*((*var.volume)[e]);
-//					b[i]=b[i] + (0.5)*pho*c*phi(i)*phi(j)*2*((*var.volume)[e]) * local[j];
-					M[conn[i]][conn[j]] += m[i][j];
 					K[conn[i]][conn[j]] += k[i][j];
-//					A[i][j]=M[i][j]+time_step*K[i][j];
 				}
-
-				if(((a1[0]+b1[0]+c1[0])/3)-100<=1 && ((a1[1]+b1[1]+c1[1])/3)-100<1)
-				{			
-					f[i]= 0.5*f1*phi(i)*2*((*var.volume)[e]);
-				}
-				else
-				{
-					f[i]=0;
-				}
-			
-				F[conn[i]] += f[i];
 			}
 		}
 
-	}
+ 	}
 // /////////////////////////////////////////////////////////////////////////////
 // ////select the solver, if you do not use other solvers, please comment it.
 // //// each time could only use one solver.
