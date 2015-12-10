@@ -47,7 +47,7 @@ void allocate_variables(const Param &param, Variables& var)
 // //		k: heat diffusion coefficient
 // //		f: heat production rate
 // //////////////////////////////////////////////////////////////////
-	double *F,*T,local_T,*f;
+	double *F,*T,local_T,*f,*b,*U;
 	double time_step=1.0,pho=1.29,c=1.004,k_diff_inside=1.9e-5,f1=2000,tol=1e-5,sum1;
 	const int node = var.nnode;
 	const int element = var.nelem;
@@ -62,16 +62,18 @@ void allocate_variables(const Param &param, Variables& var)
 	for(int n=0; n<var.nnode;n++){
 		M[n] = new double[var.nnode];
 	}
-//	double **A = new double *[var.nnode];
-//	for(int n=0; n<var.nnode;n++){
-//		A[n] = new double[var.nnode];
-//	}
+	double **A = new double *[var.nnode];
+	for(int n=0; n<var.nnode;n++){
+		A[n] = new double[var.nnode];
+	}
 /////////////////////////////////////////////////////////////////
 ///   heat production rate and temperature
 ////////////////////////////////////////////////////////////////
 	F = new double[var.nnode];
 	f = new double[3];
 	T = new double[var.nnode];
+	b = new double[var.nnode];
+	U = new double[var.nnode];
 	for(int i=0; i<var.nnode; i++)
 	{
 		T[i]=20.0;
@@ -301,6 +303,30 @@ void allocate_variables(const Param &param, Variables& var)
 		}
 
  	}
+ // Finish loop over all the element 
+// Find out the A and b matrix, which will be used in CG method
+ 	for(int i=0; i<var.nnode; i++)
+ 	{
+ 		for(int j=0; j<var.nnode; j++)
+ 		{
+ 			A[i][j]=M[i][j]+time_step*K[i][j];
+ 		}
+ 	}
+ 	for(int i=0; i<var.nnode; i++)
+ 	{
+ 		for(int j=0; j<var.nnode; j++)
+ 		{
+ 			if((*var.bcflag)[j] != 0)
+ 			{
+ 				U[j]=0;
+ 			}
+ 			else
+ 			{
+ 				U[j]=20;
+ 			}
+ 			b[i]=M[i][j]*U[j]+time_step*F[i];
+ 		}
+ 	}
 // /////////////////////////////////////////////////////////////////////////////
 // ////select the solver, if you do not use other solvers, please comment it.
 // //// each time could only use one solver.
@@ -309,17 +335,17 @@ void allocate_variables(const Param &param, Variables& var)
 	for(unsigned int step=0; step<1000000; step++)
 	{	
 		double sum=0.0;
-//		sum1 = CG(A, F, T, node, node);
+		sum1 = CG(A, F, T, node, node);
 //		sum1 = grd( A, b, x, N, M);
 //		sum1 = Jacobi(A, b, x, N, M);
 //		sum1 = Gauss_seidel(A, b, x, N, M);
 //		cout<<sqrt(sum1)<<"\n";
-//		if( sqrt(sum1) <= tol)
-//		{
-//			std::cout <<"n step to converge(CG method):  " << step <<"\n" ;
-//			std::cout <<"the tolerance is : " << tol << "\n" ;
-//			break;
-//		}
+		if( sqrt(sum1) <= tol)
+		{
+			std::cout <<"n step to converge(CG method):  " << step <<"\n" ;
+			std::cout <<"the tolerance is : " << tol << "\n" ;
+			break;
+		}
 	}
 
 
@@ -327,10 +353,11 @@ void allocate_variables(const Param &param, Variables& var)
 	{
     	delete [] K[i];
 		delete [] M[i];
+		delete [] A[i];
     }
     delete [] K;
 	delete [] M;
-
+	delete [] A;
 	for(unsigned int i=0; i<3;i++)
 	{
 		delete [] k[i];
@@ -339,9 +366,10 @@ void allocate_variables(const Param &param, Variables& var)
 	}
 	delete [] k;
 	delete [] m;
-//	delete [] ke;
+	delete [] b;
     delete [] F;
 	delete [] T;
 	delete [] f;
+	delete [] U;
 //	delete [] local;
 }
